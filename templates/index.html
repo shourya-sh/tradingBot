@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Office Trading Bot - Paper Trading</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Roboto:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f9d423 0%, #ff4e50 100%);
+            font-family: 'Roboto', Arial, sans-serif;
+            color: #222;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: #fffbe7;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-family: 'Permanent Marker', cursive;
+            color: #ff4e50;
+            font-size: 2.5em;
+            margin-bottom: 0.2em;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        .subtitle {
+            font-size: 1.2em;
+            color: #f9d423;
+            margin-bottom: 1.5em;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        .dunder {
+            font-family: 'Permanent Marker', cursive;
+            color: #222;
+            font-size: 1.3em;
+            margin-bottom: 1em;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        .portfolio-summary {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .metric {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .positive { color: #388e3c; }
+        .negative { color: #d32f2f; }
+        .neutral { color: #666; }
+        .positions {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .position {
+            background: #e3f2fd;
+            border-left: 8px solid #ff4e50;
+            margin-bottom: 10px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 1.1em;
+        }
+        .position.buy { border-left-color: #388e3c; }
+        .position.sell { border-left-color: #ff4e50; }
+        .trade {
+            background: #e3f2fd;
+            border-left: 8px solid #ff4e50;
+            margin-bottom: 10px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .trade.buy { border-left-color: #388e3c; }
+        .trade.sell { border-left-color: #ff4e50; }
+        .quote {
+            font-style: italic;
+            color: #888;
+            font-size: 1.1em;
+            text-align: center;
+            grid-column: 1 / -1;
+            margin-top: 20px;
+        }
+        .market-data {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .market-item {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .signal-buy { background: #c8e6c9; }
+        .signal-sell { background: #ffcdd2; }
+        .signal-hold { background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <div class="dunder">Dunder Mifflin Paper Co. Trading Bot</div>
+    <h1>Welcome to Scranton Trading!</h1>
+    <div class="subtitle">"Bears. Beets. Battlestar Galactica. ...And Trades."</div>
+    
+    <div class="container">
+        <div class="portfolio-summary" id="portfolio-summary">
+            <div class="metric">
+                <div class="metric-value" id="cash-balance">Loading...</div>
+                <div class="metric-label">Cash Balance</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="portfolio-value">Loading...</div>
+                <div class="metric-label">Portfolio Value</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="total-pnl">Loading...</div>
+                <div class="metric-label">Total P&L</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="pnl-pct">Loading...</div>
+                <div class="metric-label">P&L %</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Current Positions</h3>
+            <div class="positions" id="positions">Loading positions...</div>
+        </div>
+
+        <div class="card">
+            <h3>Market Data</h3>
+            <div class="market-data" id="market-data">Loading market data...</div>
+        </div>
+
+        <div class="card">
+            <h3>Recent Trades</h3>
+            <div id="trades">Loading trades...</div>
+        </div>
+    </div>
+
+    <div class="quote" id="quote">Loading quote...</div>
+
+    <script>
+        async function fetchPortfolio() {
+            try {
+                const res = await fetch('/api/portfolio');
+                const data = await res.json();
+                
+                document.getElementById('cash-balance').textContent = `$${data.cash_balance}`;
+                document.getElementById('portfolio-value').textContent = `$${data.portfolio_value}`;
+                
+                const pnlElement = document.getElementById('total-pnl');
+                pnlElement.textContent = `$${data.total_pnl}`;
+                pnlElement.className = `metric-value ${data.total_pnl >= 0 ? 'positive' : 'negative'}`;
+                
+                const pnlPctElement = document.getElementById('pnl-pct');
+                pnlPctElement.textContent = `${data.pnl_pct}%`;
+                pnlPctElement.className = `metric-value ${data.pnl_pct >= 0 ? 'positive' : 'negative'}`;
+                
+                // Update positions
+                const positionsDiv = document.getElementById('positions');
+                if (data.positions.length === 0) {
+                    positionsDiv.textContent = 'No open positions';
+                } else {
+                    positionsDiv.innerHTML = data.positions.map(pos => `
+                        <div class="position">
+                            <strong>${pos.asset}</strong><br>
+                            Quantity: ${pos.quantity}<br>
+                            Avg Price: $${pos.avg_price}<br>
+                            Current Value: $${pos.current_value}<br>
+                            P&L: $${pos.pnl} (${pos.pnl_pct}%)
+                        </div>
+                    `).join('');
+                }
+                
+                document.getElementById('quote').textContent = data.current_quote;
+            } catch (error) {
+                console.error('Error fetching portfolio:', error);
+            }
+        }
+
+        async function fetchTrades() {
+            try {
+                const res = await fetch('/api/trades');
+                const trades = await res.json();
+                const tradesDiv = document.getElementById('trades');
+                
+                if (trades.length === 0) {
+                    tradesDiv.textContent = 'No trades yet!';
+                    return;
+                }
+                
+                tradesDiv.innerHTML = trades.map(trade => `
+                    <div class="trade ${trade.action}">
+                        <span><b>${trade.action.toUpperCase()}</b> ${trade.quantity} ${trade.asset} @ $${trade.price}</span>
+                        <span>${trade.timestamp}</span>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching trades:', error);
+            }
+        }
+
+        async function fetchMarketData() {
+            try {
+                const res = await fetch('/api/market-data');
+                const marketData = await res.json();
+                const marketDiv = document.getElementById('market-data');
+                
+                marketDiv.innerHTML = Object.entries(marketData).map(([asset, data]) => {
+                    const signal = data.analysis?.signal || 'hold';
+                    const signalClass = `signal-${signal}`;
+                    return `
+                        <div class="market-item ${signalClass}">
+                            <strong>${asset}</strong><br>
+                            $${data.current_price}<br>
+                            Signal: ${signal.toUpperCase()}<br>
+                            ${data.analysis?.price_change_pct ? `${data.analysis.price_change_pct}%` : ''}
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error fetching market data:', error);
+            }
+        }
+
+        function refresh() {
+            fetchPortfolio();
+            fetchTrades();
+            fetchMarketData();
+        }
+
+        // Refresh every 5 seconds
+        setInterval(refresh, 5000);
+        refresh();
+    </script>
+</body>
+</html> 
